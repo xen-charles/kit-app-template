@@ -52,8 +52,10 @@ class XenopsPendulumExtension(omni.ext.IExt):
             stage = omni.usd.get_context().get_stage()
 
         # Clear existing content
-        omni.kit.commands.execute('SelectAllPrims')
-        omni.kit.commands.execute('DeletePrims')
+        root_prim = stage.GetDefaultPrim()
+        if root_prim:
+            for child in root_prim.GetChildren():
+                omni.kit.commands.execute('DeletePrims', paths=[str(child.GetPath())])
 
         # Set up physics scene
         self._setup_physics_scene(stage)
