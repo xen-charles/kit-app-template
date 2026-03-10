@@ -26,10 +26,16 @@ class XenopsPendulumExtension(omni.ext.IExt):
         self._timeline = omni.timeline.get_timeline_interface()
         self._events = omni.kit.app.get_app().get_message_bus_event_stream()
 
-        # Add menu item
+        self._baking = False
+
+        # Add menu items
         self._menu_path = "Create/Physics/Pendulum Demo"
         omni.kit.menu.utils.add_menu_items(
-            [MenuItemDescription(name="Pendulum Demo", onclick_fn=lambda: self.create_pendulum_scene())],
+            [
+                MenuItemDescription(name="Pendulum Demo", onclick_fn=lambda: self.create_pendulum_scene()),
+                MenuItemDescription(name="Start Bake", onclick_fn=lambda: self.start_bake()),
+                MenuItemDescription(name="Stop Bake", onclick_fn=lambda: self.stop_bake()),
+            ],
             "Create"
         )
         stage = omni.usd.get_context().get_stage()
@@ -188,6 +194,9 @@ class XenopsPendulumExtension(omni.ext.IExt):
 
         # Re-acquire handles from stage (survives reload)
         self._bob_prim = stage.GetPrimAtPath("/World/PendulumBob")
+        bob_ops = UsdGeom.Xformable(self._bob_prim).GetOrderedXformOps()
+        self._bob_translate_op = bob_ops[0]
+
         rod_prim = stage.GetPrimAtPath("/World/PendulumRod")
         self._rod_cylinder = UsdGeom.Cylinder(rod_prim)
         ops = UsdGeom.Xformable(rod_prim).GetOrderedXformOps()
@@ -203,9 +212,18 @@ class XenopsPendulumExtension(omni.ext.IExt):
     def _on_physics_step(self, dt):
         self._rotate_rod_to_bob(self._stage)
 
+    def start_bake(self):
+        """Start recording time-sampled animation for the rod."""
+        self._baking = True
+        print("[xenops.pendulum] Baking started — rod transforms will be written as time samples")
+
+    def stop_bake(self):
+        """Stop recording and print a reminder to save the stage."""
+        self._baking = False
+        print("[xenops.pendulum] Baking stopped — save the stage to persist the recorded animation")
+
     def _rotate_rod_to_bob(self, stage):
         """Rotate the rod to always point towards the bob."""
-        # This will be called on each physics step to update the rod's orientation
         xform_cache = UsdGeom.XformCache()
         bob_world = xform_cache.GetLocalToWorldTransform(self._bob_prim)
         bob_pos = bob_world.ExtractTranslation()
@@ -220,9 +238,17 @@ class XenopsPendulumExtension(omni.ext.IExt):
         length = math.sqrt(dx * dx + dy * dy)
         angle = math.degrees(math.atan2(-dx, dy))
 
-        self._rod_translate_op.Set(mid)
-        self._rod_rotate_op.Set(Gf.Vec3f(90, 0, angle))
-        self._rod_cylinder.GetHeightAttr().Set(length)
+        if self._baking:
+            frame = self._timeline.get_current_time() * self._timeline.get_time_codes_per_seconds()
+            time = Usd.TimeCode(frame)
+            self._bob_translate_op.Set(Gf.Vec3d(bob_pos), time)
+            self._rod_translate_op.Set(mid, time)
+            self._rod_rotate_op.Set(Gf.Vec3f(90, 0, angle), time)
+            self._rod_cylinder.GetHeightAttr().Set(length, time)
+        else:
+            self._rod_translate_op.Set(mid)
+            self._rod_rotate_op.Set(Gf.Vec3f(90, 0, angle))
+            self._rod_cylinder.GetHeightAttr().Set(length)
 
     def _add_lighting(self, stage):
         """Add basic lighting to the scene."""
