@@ -36,3 +36,16 @@ deps/**/user.toml
 
 # Streaming EventTrace
 *.etli
+
+# Image files
+*.png
+*.ico
+*.svg
+
+# Temp and build
+*.tmp
+*.cache
+
+# Dev
+*.code-workspace
+*.log
