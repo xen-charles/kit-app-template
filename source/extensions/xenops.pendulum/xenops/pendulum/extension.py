@@ -35,6 +35,8 @@ class XenopsPendulumExtension(omni.ext.IExt):
                 MenuItemDescription(name="Pendulum Demo", onclick_fn=lambda: self.create_pendulum_scene()),
                 MenuItemDescription(name="Start Bake", onclick_fn=lambda: self.start_bake()),
                 MenuItemDescription(name="Stop Bake", onclick_fn=lambda: self.stop_bake()),
+                MenuItemDescription(name="Save State", onclick_fn=lambda: self.save_state()),
+                MenuItemDescription(name="Restore State", onclick_fn=lambda: self.restore_state()),
             ],
             "Create"
         )
@@ -211,6 +213,40 @@ class XenopsPendulumExtension(omni.ext.IExt):
 
     def _on_physics_step(self, dt):
         self._rotate_rod_to_bob(self._stage)
+
+    def save_state(self):
+        """Save the bob's current world position and velocity as custom attributes on the prim."""
+        xform_cache = UsdGeom.XformCache()
+        bob_world = xform_cache.GetLocalToWorldTransform(self._bob_prim)
+        pos = bob_world.ExtractTranslation()
+
+        rigid_body = UsdPhysics.RigidBodyAPI(self._bob_prim)
+        vel = rigid_body.GetVelocityAttr().Get() or Gf.Vec3f(0, 0, 0)
+
+        self._bob_prim.CreateAttribute("pendulum:savedPosition", Sdf.ValueTypeNames.Vector3d, custom=True).Set(Gf.Vec3d(pos))
+        self._bob_prim.CreateAttribute("pendulum:savedVelocity", Sdf.ValueTypeNames.Vector3f, custom=True).Set(Gf.Vec3f(vel))
+
+        print(f"[xenops.pendulum] State saved — position: {pos}, velocity: {vel}")
+
+    def restore_state(self):
+        """Restore the bob's position and velocity from saved custom attributes."""
+        pos_attr = self._bob_prim.GetAttribute("pendulum:savedPosition")
+        vel_attr = self._bob_prim.GetAttribute("pendulum:savedVelocity")
+
+        if not pos_attr.IsValid() or not vel_attr.IsValid():
+            print("[xenops.pendulum] No saved state found — use Save State first")
+            return
+
+        pos = pos_attr.Get()
+        vel = vel_attr.Get()
+
+        bob_ops = UsdGeom.Xformable(self._bob_prim).GetOrderedXformOps()
+        bob_ops[0].Set(Gf.Vec3d(pos))
+
+        rigid_body = UsdPhysics.RigidBodyAPI(self._bob_prim)
+        rigid_body.GetVelocityAttr().Set(Gf.Vec3f(vel))
+
+        print(f"[xenops.pendulum] State restored — position: {pos}, velocity: {vel}")
 
     def start_bake(self):
         """Start recording time-sampled animation for the rod."""
