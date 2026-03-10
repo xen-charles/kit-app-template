@@ -215,21 +215,30 @@ class XenopsPendulumExtension(omni.ext.IExt):
         self._rotate_rod_to_bob(self._stage)
 
     def save_state(self):
-        """Save the bob's current world position and velocity as custom attributes on the prim."""
+        """Save the bob and rod state as custom attributes on their prims."""
         xform_cache = UsdGeom.XformCache()
+
+        # Bob position and velocity
         bob_world = xform_cache.GetLocalToWorldTransform(self._bob_prim)
         pos = bob_world.ExtractTranslation()
-
         rigid_body = UsdPhysics.RigidBodyAPI(self._bob_prim)
         vel = rigid_body.GetVelocityAttr().Get() or Gf.Vec3f(0, 0, 0)
-
         self._bob_prim.CreateAttribute("pendulum:savedPosition", Sdf.ValueTypeNames.Vector3d, custom=True).Set(Gf.Vec3d(pos))
         self._bob_prim.CreateAttribute("pendulum:savedVelocity", Sdf.ValueTypeNames.Vector3f, custom=True).Set(Gf.Vec3f(vel))
 
-        print(f"[xenops.pendulum] State saved — position: {pos}, velocity: {vel}")
+        # Rod translate, rotate, height
+        rod_prim = self._rod_cylinder.GetPrim()
+        rod_translate = self._rod_translate_op.Get() or Gf.Vec3d(0, 0, 0)
+        rod_rotate = self._rod_rotate_op.Get() or Gf.Vec3f(0, 0, 0)
+        rod_height = self._rod_cylinder.GetHeightAttr().Get() or 0.0
+        rod_prim.CreateAttribute("pendulum:savedTranslate", Sdf.ValueTypeNames.Vector3d, custom=True).Set(Gf.Vec3d(rod_translate))
+        rod_prim.CreateAttribute("pendulum:savedRotate", Sdf.ValueTypeNames.Vector3f, custom=True).Set(Gf.Vec3f(rod_rotate))
+        rod_prim.CreateAttribute("pendulum:savedHeight", Sdf.ValueTypeNames.Double, custom=True).Set(float(rod_height))
+
+        print(f"[xenops.pendulum] State saved — bob pos: {pos}, vel: {vel}, rod translate: {rod_translate}, rotate: {rod_rotate}, height: {rod_height}")
 
     def restore_state(self):
-        """Restore the bob's position and velocity from saved custom attributes."""
+        """Restore the bob and rod state from saved custom attributes."""
         pos_attr = self._bob_prim.GetAttribute("pendulum:savedPosition")
         vel_attr = self._bob_prim.GetAttribute("pendulum:savedVelocity")
 
@@ -239,14 +248,23 @@ class XenopsPendulumExtension(omni.ext.IExt):
 
         pos = pos_attr.Get()
         vel = vel_attr.Get()
-
         bob_ops = UsdGeom.Xformable(self._bob_prim).GetOrderedXformOps()
         bob_ops[0].Set(Gf.Vec3d(pos))
-
         rigid_body = UsdPhysics.RigidBodyAPI(self._bob_prim)
         rigid_body.GetVelocityAttr().Set(Gf.Vec3f(vel))
 
-        print(f"[xenops.pendulum] State restored — position: {pos}, velocity: {vel}")
+        rod_prim = self._rod_cylinder.GetPrim()
+        rod_translate = rod_prim.GetAttribute("pendulum:savedTranslate").Get()
+        rod_rotate = rod_prim.GetAttribute("pendulum:savedRotate").Get()
+        rod_height = rod_prim.GetAttribute("pendulum:savedHeight").Get()
+        if rod_translate is not None:
+            self._rod_translate_op.Set(Gf.Vec3d(rod_translate))
+        if rod_rotate is not None:
+            self._rod_rotate_op.Set(Gf.Vec3f(rod_rotate))
+        if rod_height is not None:
+            self._rod_cylinder.GetHeightAttr().Set(float(rod_height))
+
+        print(f"[xenops.pendulum] State restored — bob pos: {pos}, vel: {vel}")
 
     def start_bake(self):
         """Start recording time-sampled animation for the rod."""
