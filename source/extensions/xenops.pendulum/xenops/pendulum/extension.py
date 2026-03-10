@@ -6,7 +6,7 @@ import omni.kit.commands
 import omni.kit.menu.utils
 from omni.kit.menu.utils import MenuItemDescription
 import omni.usd
-from pxr import Usd, UsdGeom, UsdPhysics, Gf, Sdf
+from pxr import Usd, UsdGeom, UsdPhysics, UsdLux, Gf, Sdf
 import omni.physx
 from omni.physx import get_physx_interface
 import omni.timeline
@@ -169,7 +169,7 @@ class XenopsPendulumExtension(omni.ext.IExt):
         """Add basic lighting to the scene."""
         # Create a distant light
         light_path = "/World/DistantLight"
-        distant_light = UsdGeom.DistantLight.Define(stage, light_path)
+        distant_light = UsdLux.DistantLight.Define(stage, light_path)
         distant_light.CreateIntensityAttr().Set(1000.0)
         distant_light.CreateColorAttr().Set(Gf.Vec3f(1.0, 1.0, 1.0))
 
