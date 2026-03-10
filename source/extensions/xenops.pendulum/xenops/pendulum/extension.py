@@ -4,6 +4,7 @@
 import omni.ext
 import omni.kit.commands
 import omni.kit.menu.utils
+from omni.kit.menu.utils import MenuItemDescription
 import omni.usd
 from pxr import Usd, UsdGeom, UsdPhysics, Gf, Sdf
 import omni.physx
@@ -25,7 +26,7 @@ class XenopsPendulumExtension(omni.ext.IExt):
         # Add menu item
         self._menu_path = "Create/Physics/Pendulum Demo"
         omni.kit.menu.utils.add_menu_items(
-            [(self._menu_path, "", lambda: self.create_pendulum_scene())],
+            [MenuItemDescription(name="Pendulum Demo", onclick_fn=lambda: self.create_pendulum_scene())],
             "Create"
         )
 
