@@ -215,7 +215,15 @@ class XenopsPendulumExtension(omni.ext.IExt):
         self._rotate_rod_to_bob(self._stage)
 
     def save_state(self):
-        """Save the bob and rod state as custom attributes on their prims."""
+        """Save the bob and rod state as custom attributes on their prims.
+        Pauses simulation first so PhysX has flushed its state back to USD."""
+        if not hasattr(self, '_bob_prim') or not self._bob_prim.IsValid():
+            print("[xenops.pendulum] No pendulum scene found — create one first")
+            return
+        was_playing = self._timeline.is_playing()
+        if was_playing:
+            self._timeline.pause()
+
         xform_cache = UsdGeom.XformCache()
 
         # Bob position and velocity
@@ -223,8 +231,10 @@ class XenopsPendulumExtension(omni.ext.IExt):
         pos = bob_world.ExtractTranslation()
         rigid_body = UsdPhysics.RigidBodyAPI(self._bob_prim)
         vel = rigid_body.GetVelocityAttr().Get() or Gf.Vec3f(0, 0, 0)
+        ang_vel = rigid_body.GetAngularVelocityAttr().Get() or Gf.Vec3f(0, 0, 0)
         self._bob_prim.CreateAttribute("pendulum:savedPosition", Sdf.ValueTypeNames.Vector3d, custom=True).Set(Gf.Vec3d(pos))
         self._bob_prim.CreateAttribute("pendulum:savedVelocity", Sdf.ValueTypeNames.Vector3f, custom=True).Set(Gf.Vec3f(vel))
+        self._bob_prim.CreateAttribute("pendulum:savedAngularVelocity", Sdf.ValueTypeNames.Vector3f, custom=True).Set(Gf.Vec3f(ang_vel))
 
         # Rod translate, rotate, height
         rod_prim = self._rod_cylinder.GetPrim()
@@ -235,10 +245,17 @@ class XenopsPendulumExtension(omni.ext.IExt):
         rod_prim.CreateAttribute("pendulum:savedRotate", Sdf.ValueTypeNames.Vector3f, custom=True).Set(Gf.Vec3f(rod_rotate))
         rod_prim.CreateAttribute("pendulum:savedHeight", Sdf.ValueTypeNames.Double, custom=True).Set(float(rod_height))
 
-        print(f"[xenops.pendulum] State saved — bob pos: {pos}, vel: {vel}, rod translate: {rod_translate}, rotate: {rod_rotate}, height: {rod_height}")
+        if was_playing:
+            self._timeline.play()
+
+        print(f"[xenops.pendulum] State saved — bob pos: {pos}, vel: {vel}, ang_vel: {ang_vel}")
 
     def restore_state(self):
-        """Restore the bob and rod state from saved custom attributes."""
+        """Restore the bob and rod state from saved custom attributes.
+        Stops simulation so PhysX re-reads initial conditions from USD on next play."""
+        if not hasattr(self, '_bob_prim') or not self._bob_prim.IsValid():
+            print("[xenops.pendulum] No pendulum scene found — create one first")
+            return
         pos_attr = self._bob_prim.GetAttribute("pendulum:savedPosition")
         vel_attr = self._bob_prim.GetAttribute("pendulum:savedVelocity")
 
@@ -246,12 +263,18 @@ class XenopsPendulumExtension(omni.ext.IExt):
             print("[xenops.pendulum] No saved state found — use Save State first")
             return
 
+        # Stop sim — PhysX will re-read USD attrs as initial conditions on next Play
+        self._timeline.stop()
+
         pos = pos_attr.Get()
         vel = vel_attr.Get()
+        ang_vel = self._bob_prim.GetAttribute("pendulum:savedAngularVelocity").Get() or Gf.Vec3f(0, 0, 0)
+
         bob_ops = UsdGeom.Xformable(self._bob_prim).GetOrderedXformOps()
         bob_ops[0].Set(Gf.Vec3d(pos))
         rigid_body = UsdPhysics.RigidBodyAPI(self._bob_prim)
         rigid_body.GetVelocityAttr().Set(Gf.Vec3f(vel))
+        rigid_body.GetAngularVelocityAttr().Set(Gf.Vec3f(ang_vel))
 
         rod_prim = self._rod_cylinder.GetPrim()
         rod_translate = rod_prim.GetAttribute("pendulum:savedTranslate").Get()
@@ -264,7 +287,7 @@ class XenopsPendulumExtension(omni.ext.IExt):
         if rod_height is not None:
             self._rod_cylinder.GetHeightAttr().Set(float(rod_height))
 
-        print(f"[xenops.pendulum] State restored — bob pos: {pos}, vel: {vel}")
+        print(f"[xenops.pendulum] State restored — bob pos: {pos}, vel: {vel}, ang_vel: {ang_vel} — press Play to resume")
 
     def start_bake(self):
         """Start recording time-sampled animation for the rod."""
