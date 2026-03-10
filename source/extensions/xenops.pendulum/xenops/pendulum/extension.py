@@ -64,9 +64,10 @@ class XenopsPendulumExtension(omni.ext.IExt):
 
         # Create pendulum components
         self._create_anchor_point(stage)
-        pendulum_prim = self._create_pendulum_bob(stage)
-        self._create_pendulum_rod(stage, pendulum_prim)
+        self._bob_prim = self._create_pendulum_bob(stage)
+        self._create_pendulum_rod(stage, self._bob_prim)
         self._setup_pendulum_joint(stage)
+        self._setup_rod_update(stage)
 
         # Add lighting
         self._add_lighting(stage)
@@ -137,15 +138,19 @@ class XenopsPendulumExtension(omni.ext.IExt):
 
         # Position the rod between anchor and bob
         rod_xform = UsdGeom.Xformable(rod_cylinder)
-        rod_xform.AddTranslateOp().Set(Gf.Vec3d(15, 75, 0))  # Midpoint
+        # rod_xform.AddTranslateOp().Set(Gf.Vec3d(15, 75, 0))  # Midpoint
 
-        rotation = (0,90,0)
-        # Rotate to connect anchor and bob initially
-        rod_xform.AddRotateXYZOp().Set(Gf.Vec3f(*rotation))  # Initial angle
-        print(f"[xenops.pendulum] Initial rod rotation set to {rotation} degrees")
-        # Make rod kinematic (moves but doesn't have physics forces)
-        rigid_body = UsdPhysics.RigidBodyAPI.Apply(rod_cylinder.GetPrim())
-        rigid_body.CreateKinematicEnabledAttr().Set(True)
+        # rotation = (0,90,0)
+        # # Rotate to connect anchor and bob initially
+        # rod_xform.AddRotateXYZOp().Set(Gf.Vec3f(*rotation))  # Initial angle
+        # print(f"[xenops.pendulum] Initial rod rotation set to {rotation} degrees")
+        # # Make rod kinematic (moves but doesn't have physics forces)
+        # rigid_body = UsdPhysics.RigidBodyAPI.Apply(rod_cylinder.GetPrim())
+        # rigid_body.CreateKinematicEnabledAttr().Set(True)
+
+        self._rod_cylinder = rod_cylinder
+        self._rod_translate_op = rod_xform.AddTranslateOp()
+        self._rod_rotate_op = rod_xform.AddRotateXYZOp()
 
         print("[xenops.pendulum] Pendulum rod created")
 
