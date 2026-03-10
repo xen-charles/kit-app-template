@@ -11,7 +11,9 @@ import omni.physx
 from omni.physx import get_physx_interface
 import omni.timeline
 import carb.events
+import math
 
+print("[xenops.pendulum] Extension module imported")
 
 class XenopsPendulumExtension(omni.ext.IExt):
     """Extension for creating a physics-based pendulum demonstration."""
@@ -137,9 +139,10 @@ class XenopsPendulumExtension(omni.ext.IExt):
         rod_xform = UsdGeom.Xformable(rod_cylinder)
         rod_xform.AddTranslateOp().Set(Gf.Vec3d(15, 75, 0))  # Midpoint
 
+        rotation = (0,90,0)
         # Rotate to connect anchor and bob initially
-        rod_xform.AddRotateXYZOp().Set(Gf.Vec3f(0, 0, -30))  # Initial angle
-
+        rod_xform.AddRotateXYZOp().Set(Gf.Vec3f(*rotation))  # Initial angle
+        print(f"[xenops.pendulum] Initial rod rotation set to {rotation} degrees")
         # Make rod kinematic (moves but doesn't have physics forces)
         rigid_body = UsdPhysics.RigidBodyAPI.Apply(rod_cylinder.GetPrim())
         rigid_body.CreateKinematicEnabledAttr().Set(True)
@@ -164,6 +167,33 @@ class XenopsPendulumExtension(omni.ext.IExt):
         joint.CreateLocalPos1Attr().Set(Gf.Vec3f(-30, 50, 0))  # Relative to bob
 
         print("[xenops.pendulum] Pendulum joint created")
+
+    def _setup_rod_update(self, stage):
+        from omni.physx import get_physx_interface
+        self._stage = stage
+        self._anchor_pos = Gf.Vec3d(0, 100, 0)
+        self._physx_sub = get_physx_interface().subscribe_physics_step_events(
+            self._on_physics_step
+        )
+
+    def _on_physics_step(self, dt):
+        xform_cache = UsdGeom.XformCache()
+        bob_world = xform_cache.GetLocalToWorldTransform(self._bob_prim)
+        bob_pos = bob_world.ExtractTranslation()
+
+        anchor = self._anchor_pos
+        dx = bob_pos[0] - anchor[0]
+        dy = bob_pos[1] - anchor[1]
+
+        mid = Gf.Vec3d((anchor[0] + bob_pos[0]) / 2,
+                    (anchor[1] + bob_pos[1]) / 2,
+                    0)
+        length = math.sqrt(dx * dx + dy * dy)
+        angle  = math.degrees(math.atan2(dx, -dy))  # Z rotation from -Y (down)
+
+        self._rod_translate_op.Set(mid)
+        self._rod_rotate_op.Set(Gf.Vec3f(0, 0, angle))
+        self._rod_cylinder.GetHeightAttr().Set(length)
 
     def _add_lighting(self, stage):
         """Add basic lighting to the scene."""

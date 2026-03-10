@@ -25,6 +25,9 @@ repository = "https://github.com/NVIDIA-Omniverse/kit-app-template"
 [[python.module]]
 name = "xenops.pendulum"
 
+[python.scripts]
+watch_path = true
+
 [documentation]
 pages = [
     "docs/Overview.md",
