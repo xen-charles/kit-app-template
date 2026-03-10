@@ -4,6 +4,7 @@
 import omni.ext
 import omni.kit.commands
 import omni.kit.menu.utils
+import omni.kit
 from omni.kit.menu.utils import MenuItemDescription
 import omni.usd
 from pxr import Usd, UsdGeom, UsdPhysics, UsdLux, Gf, Sdf
@@ -31,12 +32,19 @@ class XenopsPendulumExtension(omni.ext.IExt):
             [MenuItemDescription(name="Pendulum Demo", onclick_fn=lambda: self.create_pendulum_scene())],
             "Create"
         )
+        stage = omni.usd.get_context().get_stage()
+        if stage and stage.GetPrimAtPath("/World/PendulumBob").IsValid():
+            self._setup_rod_update(stage)
 
         print("[xenops.pendulum] Menu item added to Create > Physics")
 
     def on_shutdown(self):
         """Called when the extension shuts down."""
         print("[xenops.pendulum] Pendulum Demo Extension shutdown")
+
+        if hasattr(self, '_physx_sub'):
+            self._physx_sub.unsubscribe()
+            self._physx_sub = None
 
         # Remove menu item
         if hasattr(self, '_menu_path'):
@@ -177,11 +185,27 @@ class XenopsPendulumExtension(omni.ext.IExt):
         from omni.physx import get_physx_interface
         self._stage = stage
         self._anchor_pos = Gf.Vec3d(0, 100, 0)
-        self._physx_sub = get_physx_interface().subscribe_physics_step_events(
-            self._on_physics_step
+
+        # Re-acquire handles from stage (survives reload)
+        self._bob_prim = stage.GetPrimAtPath("/World/PendulumBob")
+        rod_prim = stage.GetPrimAtPath("/World/PendulumRod")
+        self._rod_cylinder = UsdGeom.Cylinder(rod_prim)
+        ops = UsdGeom.Xformable(rod_prim).GetOrderedXformOps()
+        self._rod_translate_op = ops[0]
+        self._rod_rotate_op = ops[1]
+
+        self._physx_sub = omni.kit.app.get_app().get_update_event_stream().create_subscription_to_pop(
+            lambda e: self._rotate_rod_to_bob(self._stage),
+            name="pendulum_rod_update"
         )
+        self._rotate_rod_to_bob(stage)
 
     def _on_physics_step(self, dt):
+        self._rotate_rod_to_bob(self._stage)
+
+    def _rotate_rod_to_bob(self, stage):
+        """Rotate the rod to always point towards the bob."""
+        # This will be called on each physics step to update the rod's orientation
         xform_cache = UsdGeom.XformCache()
         bob_world = xform_cache.GetLocalToWorldTransform(self._bob_prim)
         bob_pos = bob_world.ExtractTranslation()
@@ -194,10 +218,10 @@ class XenopsPendulumExtension(omni.ext.IExt):
                     (anchor[1] + bob_pos[1]) / 2,
                     0)
         length = math.sqrt(dx * dx + dy * dy)
-        angle  = math.degrees(math.atan2(dx, -dy))  # Z rotation from -Y (down)
+        angle = math.degrees(math.atan2(-dx, dy))
 
         self._rod_translate_op.Set(mid)
-        self._rod_rotate_op.Set(Gf.Vec3f(0, 0, angle))
+        self._rod_rotate_op.Set(Gf.Vec3f(90, 0, angle))
         self._rod_cylinder.GetHeightAttr().Set(length)
 
     def _add_lighting(self, stage):
