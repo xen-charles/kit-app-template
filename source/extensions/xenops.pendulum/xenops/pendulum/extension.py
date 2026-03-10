@@ -117,10 +117,6 @@ class XenopsPendulumExtension(omni.ext.IExt):
         # Add collision
         collision_api = UsdPhysics.CollisionAPI.Apply(bob_sphere.GetPrim())
 
-        # Add sphere collision shape
-        sphere_collision = UsdPhysics.SphereCollisionAPI.Apply(bob_sphere.GetPrim())
-        sphere_collision.CreateRadiusAttr().Set(5.0)
-
         # Set mass properties
         mass_api = UsdPhysics.MassAPI.Apply(bob_sphere.GetPrim())
         mass_api.CreateMassAttr().Set(10.0)  # 10 units mass
