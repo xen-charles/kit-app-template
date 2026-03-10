@@ -18,3 +18,4 @@ repo_build.prebuild_copy {
 
 define_app("xenops.first.kit")
 define_app("xenops.first_usd_explorer.kit")
+define_app("xenops.pendulum_demo.kit")

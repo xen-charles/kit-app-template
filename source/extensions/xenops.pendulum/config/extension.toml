@@ -1,0 +1,48 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+[package]
+name = "xenops.pendulum"
+title = "XENOPS Pendulum Demo"
+version = "0.1.0"
+description = "A physics-based swinging pendulum demonstration"
+category = "Simulation"
+changelog = "docs/CHANGELOG.md"
+icon = "data/icon.png"
+keywords = ["kit", "extension", "physics", "pendulum", "demo"]
+preview_image = "data/preview.png"
+readme = "docs/README.md"
+repository = "https://github.com/NVIDIA-Omniverse/kit-app-template"
+
+[dependencies]
+"omni.kit.commands" = {}
+"omni.kit.menu.utils" = {}
+"omni.kit.primitive.mesh" = {}
+"omni.physx" = {}
+"omni.physx.stageupdate" = {}
+"omni.usd" = {}
+
+[[python.module]]
+name = "xenops.pendulum"
+
+[documentation]
+pages = [
+    "docs/Overview.md",
+    "docs/CHANGELOG.md",
+]
+
+[[test]]
+dependencies = [
+    "omni.kit.ui_test",
+]
+
+args = [
+    "--/app/fastShutdown=1",
+    "--/app/file/ignoreUnsavedOnExit=true",
+    "--/app/window/dpiScaleOverride=1.0",
+    "--/app/window/height=720",
+    "--/app/window/scaleToMonitor=false",
+    "--/app/window/width=1280",
+    "--no-window",
+    "--reset-user"
+]
